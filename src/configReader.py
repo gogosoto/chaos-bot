@@ -79,6 +79,29 @@ class ConfigReader:
         self.debug_always_on = None
         self.display_mode = None
 
+        # Shape validation
+        self.shape_validation_enabled = None
+        self.check_aspect_ratio = None
+        self.aspect_ratio_min = None
+        self.aspect_ratio_max = None
+        self.check_area_threshold = None
+        self.min_blob_area = None
+        self.max_blob_area = None
+        self.check_convexity = None
+        self.min_convexity_score = None
+        self.check_solidity = None
+        self.min_solidity_score = None
+        self.check_vertical_bias = None
+        self.vertical_bias_threshold = None
+
+        # Pose detection
+        self.pose_standing_threshold = None
+        self.pose_crouching_threshold = None
+        self.pose_prone_threshold = None
+        self.pose_lead_standing = None
+        self.pose_lead_crouching = None
+        self.pose_lead_prone = None
+
         # Get config path and read it
         self.path = os.path.join(os.path.dirname(__file__), '../config.ini')
         self.parser.read(self.path)
@@ -201,6 +224,29 @@ class ConfigReader:
             self.display_mode = value
         else:
             print('WARNING: Invalid display_mode value')
+
+        # Get shape validation settings
+        self.shape_validation_enabled = self.parser.getboolean('shape_validation', 'enabled')
+        self.check_aspect_ratio = self.parser.getboolean('shape_validation', 'check_aspect_ratio')
+        self.aspect_ratio_min = float(self.parser.get('shape_validation', 'aspect_ratio_min'))
+        self.aspect_ratio_max = float(self.parser.get('shape_validation', 'aspect_ratio_max'))
+        self.check_area_threshold = self.parser.getboolean('shape_validation', 'check_area_threshold')
+        self.min_blob_area = int(self.parser.get('shape_validation', 'min_blob_area'))
+        self.max_blob_area = int(self.parser.get('shape_validation', 'max_blob_area'))
+        self.check_convexity = self.parser.getboolean('shape_validation', 'check_convexity')
+        self.min_convexity_score = float(self.parser.get('shape_validation', 'min_convexity_score'))
+        self.check_solidity = self.parser.getboolean('shape_validation', 'check_solidity')
+        self.min_solidity_score = float(self.parser.get('shape_validation', 'min_solidity_score'))
+        self.check_vertical_bias = self.parser.getboolean('shape_validation', 'check_vertical_bias')
+        self.vertical_bias_threshold = float(self.parser.get('shape_validation', 'vertical_bias_threshold'))
+
+        # Get pose detection settings
+        self.pose_standing_threshold = float(self.parser.get('pose_detection', 'pose_standing_threshold'))
+        self.pose_crouching_threshold = float(self.parser.get('pose_detection', 'pose_crouching_threshold'))
+        self.pose_prone_threshold = float(self.parser.get('pose_detection', 'pose_prone_threshold'))
+        self.pose_lead_standing = float(self.parser.get('pose_detection', 'pose_lead_standing'))
+        self.pose_lead_crouching = float(self.parser.get('pose_detection', 'pose_lead_crouching'))
+        self.pose_lead_prone = float(self.parser.get('pose_detection', 'pose_lead_prone'))
 
     @staticmethod
     def read_hex(string):

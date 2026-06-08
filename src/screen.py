@@ -19,12 +19,14 @@ import cv2
 import numpy as np
 import bettercam
 from pyautogui import size
+from shape_validator import ShapeValidator
 
 
 class Screen:
     def __init__(self, config):
         self.cfg = config
         self.cam = bettercam.create(output_color="BGR")
+        self.validator = ShapeValidator(config)
 
         if self.cfg.auto_detect_resolution:
             screen_size = size()
@@ -52,6 +54,8 @@ class Screen:
         self.closest_contour = None
         self.img = None
         self.aim_fov = (self.cfg.aim_fov_x, self.cfg.aim_fov_y)
+        self.detected_pose = "unknown"
+        self.pose_confidence = 0.0
 
         # Setup debug display
         if self.cfg.debug:
@@ -80,6 +84,8 @@ class Screen:
         self.target = None
         trigger = False
         self.closest_contour = None
+        self.detected_pose = "unknown"
+        self.pose_confidence = 0.0
 
         # Capture a screenshot
         self.img = self.screenshot(self.get_region(self.fov_region, recoil_offset))
@@ -104,18 +110,29 @@ class Screen:
         if len(contours) != 0:
             min_distance = float('inf')
             for contour in contours:
+                # Validate contour shape before processing
+                if not self.validator.is_valid_target(contour):
+                    continue
+
+                # Detect pose and get dynamic aim lead
+                pose, pose_confidence = self.validator.detect_pose(contour)
+                aim_lead = self.validator.get_aim_lead_for_pose(pose)
+
                 # Make a bounding rectangle for the target
                 rect_x, rect_y, rect_w, rect_h = cv2.boundingRect(contour)
 
                 # Calculate the coordinates of the center of the target
+                # Use dynamic aim_lead based on pose instead of fixed cfg.aim_height
                 x = rect_x + rect_w // 2 - self.fov_center[0]
-                y = int(rect_y + rect_h * (1 - self.cfg.aim_height)) - self.fov_center[1]
+                y = int(rect_y + rect_h * (1 - aim_lead)) - self.fov_center[1]
 
                 # Update the closest target if the current target is closer
                 distance = np.sqrt(x**2 + y**2)
                 if distance < min_distance:
                     min_distance = distance
                     self.closest_contour = contour
+                    self.detected_pose = pose  # Store for debug display
+                    self.pose_confidence = pose_confidence
                     if (
                             -self.aim_fov[0] <= x <= self.aim_fov[0] and
                             -self.aim_fov[1] <= y <= self.aim_fov[1]
@@ -173,7 +190,7 @@ class Screen:
                 2
             )
 
-        # Draw rectangle around closest target
+        # Draw rectangle around closest target and display pose
         if self.closest_contour is not None:
             x, y, w, h = cv2.boundingRect(self.closest_contour)
             debug_img = cv2.rectangle(
@@ -182,6 +199,17 @@ class Screen:
                 (x + w, y + h),
                 (0, 0, 255),
                 2
+            )
+            # Display detected pose on target
+            pose_text = f"{self.detected_pose} ({self.pose_confidence:.1f})"
+            cv2.putText(
+                debug_img,
+                pose_text,
+                (x, y - 5),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.4,
+                (0, 255, 255),
+                1
             )
 
         # Draw FOV, a green rectangle

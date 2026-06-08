@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unibot Control Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚙️ Unibot Control Dashboard</h1>
+            <p class="subtitle">FPS Assistant Control Panel</p>
+        </header>
+
+        <main>
+            <!-- Status Panel -->
+            <section class="panel status-panel">
+                <h2>Status</h2>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <span class="label">Target:</span>
+                        <span class="value" id="target-status">❌ None</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Pose:</span>
+                        <span class="value" id="pose-status">unknown</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">FPS:</span>
+                        <span class="value" id="fps-status">0</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Control Panel -->
+            <section class="panel control-panel">
+                <h2>Controls</h2>
+                <div class="control-grid">
+                    <button class="control-btn" id="aim-btn" onclick="toggleControl('aim')">
+                        <span class="icon">🎯</span>
+                        <span class="label">Aim Assist</span>
+                        <span class="status-light off"></span>
+                    </button>
+                    <button class="control-btn" id="trigger-btn" onclick="toggleControl('trigger')">
+                        <span class="icon">🔫</span>
+                        <span class="label">Trigger</span>
+                        <span class="status-light off"></span>
+                    </button>
+                    <button class="control-btn" id="rapid-btn" onclick="toggleControl('rapid_fire')">
+                        <span class="icon">⚡</span>
+                        <span class="label">Rapid Fire</span>
+                        <span class="status-light off"></span>
+                    </button>
+                    <button class="control-btn" id="recoil-btn" onclick="toggleControl('recoil')">
+                        <span class="icon">📉</span>
+                        <span class="label">Recoil</span>
+                        <span class="status-light off"></span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Color Tuning Panel -->
+            <section class="panel color-panel" id="color-preview-panel">
+                <h2>Color Tuning</h2>
+                <div class="preview-container">
+                    <div class="live-preview" id="color-preview">
+                        <canvas id="preview-canvas" width="320" height="240"></canvas>
+                        <div class="overlay-info">
+                            <p>Live preview (simulated)</p>
+                            <p id="detected-count">0 targets</p>
+                        </div>
+                    </div>
+                    <div class="color-controls">
+                        <div class="color-input-group">
+                            <label>Lower Bound HSV</label>
+                            <div class="hsv-inputs">
+                                <input type="number" min="0" max="179" id="lower-h" placeholder="H" onchange="updateColorPreview()">
+                                <input type="number" min="0" max="255" id="lower-s" placeholder="S" onchange="updateColorPreview()">
+                                <input type="number" min="0" max="255" id="lower-v" placeholder="V" onchange="updateColorPreview()">
+                            </div>
+                        </div>
+                        <div class="color-input-group">
+                            <label>Upper Bound HSV</label>
+                            <div class="hsv-inputs">
+                                <input type="number" min="0" max="179" id="upper-h" placeholder="H" onchange="updateColorPreview()">
+                                <input type="number" min="0" max="255" id="upper-s" placeholder="S" onchange="updateColorPreview()">
+                                <input type="number" min="0" max="255" id="upper-v" placeholder="V" onchange="updateColorPreview()">
+                            </div>
+                        </div>
+                        <button class="btn-preset" onclick="presetColor('valorant')">Valorant (Yellow)</button>
+                        <button class="btn-preset" onclick="presetColor('overwatch')">Overwatch (Blue)</button>
+                        <button class="btn-preset" onclick="presetColor('csgo')">CS:GO (Green)</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Config Panel -->
+            <section class="panel config-panel">
+                <h2>Configuration</h2>
+                <div class="tabs">
+                    <button class="tab-btn active" onclick="switchTab('aim-tab')">Aim</button>
+                    <button class="tab-btn" onclick="switchTab('trigger-tab')">Trigger</button>
+                    <button class="tab-btn" onclick="switchTab('shape-tab')">Shape</button>
+                    <button class="tab-btn" onclick="switchTab('pose-tab')">Pose</button>
+                </div>
+
+                <div id="aim-tab" class="tab-content active">
+                    <div class="config-item">
+                        <label>Speed</label>
+                        <input type="range" min="0.1" max="3" step="0.1" id="aim-speed" onchange="updateConfig('aim', 'speed', this.value)">
+                        <span id="aim-speed-val">1.0</span>
+                    </div>
+                    <div class="config-item">
+                        <label>Smoothing</label>
+                        <input type="range" min="0" max="1" step="0.1" id="aim-smooth" onchange="updateConfig('aim', 'smoothing', this.value)">
+                        <span id="aim-smooth-val">0.0</span>
+                    </div>
+                    <div class="config-item">
+                        <label>Y Multiplier</label>
+                        <input type="range" min="0.5" max="2" step="0.1" id="aim-y-mult" onchange="updateConfig('aim', 'y_multiplier', this.value)">
+                        <span id="aim-y-mult-val">1.0</span>
+                    </div>
+                </div>
+
+                <div id="trigger-tab" class="tab-content">
+                    <div class="config-item">
+                        <label>Delay (ms)</label>
+                        <input type="number" id="trigger-delay" onchange="updateConfig('trigger', 'delay', this.value)">
+                    </div>
+                    <div class="config-item">
+                        <label>Threshold</label>
+                        <input type="number" id="trigger-threshold" onchange="updateConfig('trigger', 'threshold', this.value)">
+                    </div>
+                </div>
+
+                <div id="shape-tab" class="tab-content">
+                    <div class="config-item">
+                        <label>Aspect Ratio Min</label>
+                        <input type="number" step="0.1" id="shape-aspect-min" onchange="updateConfig('shape_validation', 'aspect_ratio_min', this.value)">
+                    </div>
+                    <div class="config-item">
+                        <label>Convexity Score</label>
+                        <input type="number" step="0.1" id="shape-convexity" onchange="updateConfig('shape_validation', 'min_convexity', this.value)">
+                    </div>
+                </div>
+
+                <div id="pose-tab" class="tab-content">
+                    <div class="config-item">
+                        <label>Standing Threshold</label>
+                        <input type="number" step="0.1" id="pose-standing" onchange="updateConfig('pose_detection', 'standing_threshold', this.value)">
+                    </div>
+                    <div class="config-item">
+                        <label>Crouching Threshold</label>
+                        <input type="number" step="0.1" id="pose-crouch" onchange="updateConfig('pose_detection', 'crouching_threshold', this.value)">
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Unibot v1.1 | Access via <code id="local-ip">http://192.168.x.x:5000</code></p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
