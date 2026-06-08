@@ -1,0 +1,51 @@
+# Chaos Bot — Jetson Orin Nano Dependencies
+# Install with: pip install -r requirements-jetson.txt
+
+# Core
+numpy==1.24.3
+opencv-python==4.8.1.78
+flask==2.3.3
+pyautogui==0.9.54
+
+# ML Inference (GPU-optimized for Jetson)
+# MediaPipe with TFLite GPU support
+mediapipe==0.10.0
+
+# YOLOv8 (PyTorch optimized for Jetson)
+torch==2.0.0
+torchvision==0.15.1
+ultralytics==8.0.200
+
+# TensorRT (GPU acceleration)
+tensorrt==8.6.2
+
+# Serial communication for Pico/Arduino
+pyserial==3.5
+
+# Web server
+python-dotenv==1.0.0
+werkzeug==2.3.7
+
+# Hardware utilities
+jetson-stats==3.1.5  # Monitor Jetson performance
+pynvml==11.535.111    # NVIDIA GPU memory stats
+
+# Optional: for model conversion
+onnx==1.14.1
+onnx-simplifier==0.4.33
+
+# Optional: for profiling
+memory-profiler==0.61.0
+
+# Development (optional)
+pytest==7.4.2
+pytest-cov==4.1.0
+black==23.9.1
+flake8==6.1.0
+
+# Notes:
+# - torch/torchvision installed from https://forums.developer.nvidia.com/t/pytorch-for-jetson/
+#   Binary wheels optimized for ARM64 + CUDA
+# - MediaPipe GPU support requires libGL.so.1 (install: sudo apt install libgl1)
+# - TensorRT auto-converts models for 5-10x speedup
+# - If pip install fails, use: pip install --pre -U (for bleeding-edge CUDA support)
