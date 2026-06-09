@@ -52,6 +52,15 @@ class Screen:
         self.scale_x = game_w / cap_w if cap_w > 0 else 1.0
         self.scale_y = game_h / cap_h if cap_h > 0 else 1.0
 
+        # Hybrid detector — loaded only when detection_mode == 'hybrid'
+        self._detector = None
+        if getattr(self.cfg, 'detection_mode', 'color') == 'hybrid':
+            model_path = getattr(self.cfg, 'yolo_model', 'models/yolo11n.pt')
+            conf = getattr(self.cfg, 'yolo_confidence', 0.5)
+            from ml_object_detector import MLObjectDetector
+            self._detector = MLObjectDetector(model_path, conf)
+            print(f'[Screen] Hybrid detection enabled: {model_path}')
+
         self.screen_center = (self.screen[0] // 2, self.screen[1] // 2)
         self.screen_region = (
             0,
@@ -175,6 +184,12 @@ class Screen:
                     self.closest_contour, (self.fov_center[0], self.fov_center[1] - self.cfg.trigger_threshold), False) >= 0
             ):
                 trigger = True
+
+        # YOLO geometry confirmation on HSV candidate (hybrid mode only)
+        if self._detector is not None and self.target is None and self.img is not None and len(contours) > 0:
+            yolo_result = self._detector.best_target_in_crop(self.img, self.fov_center)
+            if yolo_result is not None:
+                self.target = yolo_result
 
         if self.cfg.debug:
             self.run_debug_window(recoil_offset)

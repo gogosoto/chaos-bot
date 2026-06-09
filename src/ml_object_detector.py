@@ -1,167 +1,82 @@
 """
-YOLOv8-Nano object detection for head/body identification.
-GPU-accelerated inference on Jetson.
+YOLOv11-nano object detection with platform-conditional backend selection.
+Called only on small HSV-filtered ROI crops — not full frames.
 """
 
 import cv2
 import numpy as np
-from ultralytics import YOLO
+
+from platform_utils import device_label
 
 
 class MLObjectDetector:
-    """YOLOv8-Nano for enemy head/body detection."""
+    """
+    YOLOv11-nano detector with platform-conditional backend.
 
-    def __init__(self, model_name='yolov8n.pt', confidence_threshold=0.5, gpu=True):
-        """Initialize YOLOv8-Nano model."""
-        self.confidence_threshold = confidence_threshold
-        self.gpu = gpu
+    Backends (selected automatically):
+      jetson     → TensorRT .engine file (~5ms inference)
+      cuda-linux → CUDA torch (~15ms, Dell RTX A2000)
+      mac-m1     → MPS (~25ms)
+      linux      → CPU (~80ms fallback)
 
-        # Load model
-        self.model = YOLO(model_name)
+    Called ONLY on small HSV-filtered ROI crops (not the full frame).
+    """
 
-        # Set to GPU if available
-        if gpu:
+    PERSON_CLASS = 0
+
+    def __init__(self, model_path: str, confidence: float = 0.5):
+        from ultralytics import YOLO
+        self.confidence = confidence
+        self._label = device_label()
+        self.model = YOLO(model_path, task='detect')
+
+        if self._label == 'jetson':
+            pass  # TensorRT engine handles device placement internally
+        elif self._label == 'cuda-linux':
             self.model.to('cuda')
+        elif self._label == 'mac-m1':
+            self.model.to('mps')
         else:
             self.model.to('cpu')
 
-        # Common object classes we care about (person, etc.)
-        self.PERSON_CLASS = 0  # COCO dataset person class
+        print(f"[MLObjectDetector] backend={self._label} model={model_path}")
 
-    def detect(self, frame):
+    def detect_in_crop(self, crop: np.ndarray) -> list[dict]:
         """
-        Detect objects in frame.
-        Returns: {
-          'detections': [
-            {'class': int, 'name': str, 'conf': float, 'bbox': (x1, y1, x2, y2)},
-            ...
-          ],
-          'inference_time_ms': float
-        }
+        Run detection on a small crop (HSV-filtered ROI).
+        Returns list of dicts: {name, conf, bbox (x1,y1,x2,y2 as ndarray)}.
         """
-        # Run inference
-        results = self.model.predict(source=frame, conf=self.confidence_threshold, verbose=False)
-
+        results = self.model.predict(source=crop, conf=self.confidence, verbose=False)
         detections = []
         for result in results:
             for box in result.boxes:
-                cls_id = int(box.cls[0])
-                confidence = float(box.conf[0])
-                bbox = box.xyxy[0].cpu().numpy()
-
-                # Only care about people
-                if cls_id == self.PERSON_CLASS:
+                if int(box.cls[0]) == self.PERSON_CLASS:
                     detections.append({
-                        'class': cls_id,
                         'name': 'person',
-                        'conf': confidence,
-                        'bbox': bbox  # (x1, y1, x2, y2)
+                        'conf': float(box.conf[0]),
+                        'bbox': box.xyxy[0].cpu().numpy(),
                     })
+        return detections
 
-        return {
-            'detections': detections,
-            'inference_time_ms': result.speed.get('inference', 0)
-        }
-
-    def filter_by_region(self, detections, roi_rect):
+    def best_target_in_crop(self, crop: np.ndarray,
+                             fov_center: tuple) -> tuple | None:
         """
-        Filter detections to only those inside ROI.
-        roi_rect: (x, y, w, h) from screen.py
+        Detect in crop, return (dx, dy) offset from fov_center to nearest head.
+        Returns None if no person confirmed.
+        Head position = top 15% of bounding box.
         """
-        x, y, w, h = roi_rect
-        filtered = []
+        detections = self.detect_in_crop(crop)
+        if not detections:
+            return None
 
+        cx, cy = fov_center
+        best, best_dist = None, float('inf')
         for det in detections:
             x1, y1, x2, y2 = det['bbox']
-            center_x = (x1 + x2) / 2
-            center_y = (y1 + y2) / 2
-
-            # Check if center is within ROI
-            if x <= center_x <= x + w and y <= center_y <= y + h:
-                filtered.append(det)
-
-        return filtered
-
-    def get_head_region(self, detection):
-        """
-        Extract head region from detection.
-        Assumes typical person proportions: head is top 20% of bbox.
-        Returns: (x1, y1, x2, y2) for head region
-        """
-        x1, y1, x2, y2 = detection['bbox']
-        height = y2 - y1
-        head_y2 = y1 + height * 0.25  # Top 25% is head
-
-        return (x1, y1, x2, head_y2)
-
-    def draw_detections(self, frame, detections, color=(0, 255, 0)):
-        """Draw detection boxes on frame (for debugging)."""
-        for det in detections:
-            x1, y1, x2, y2 = det['bbox']
-            x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-
-            # Draw box
-            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-
-            # Draw label
-            label = f"{det['name']} {det['conf']:.2f}"
-            cv2.putText(
-                frame,
-                label,
-                (x1, y1 - 5),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                color,
-                1
-            )
-
-        return frame
-
-
-class HeadTracker:
-    """Track detected heads across frames."""
-
-    def __init__(self, max_distance=50):
-        self.max_distance = max_distance
-        self.tracked_heads = {}
-        self.next_id = 0
-
-    def update(self, detections):
-        """
-        Associate detections with tracked heads.
-        Returns: list of (head_id, detection) tuples
-        """
-        tracked = []
-
-        for det in detections:
-            # Get head region
-            x1, y1, x2, y2 = det['bbox']
-            head_x = (x1 + x2) / 2
-            head_y = y1  # Top of detection
-
-            # Find nearest tracked head
-            best_id = None
-            best_distance = self.max_distance
-
-            for track_id, prev_pos in self.tracked_heads.items():
-                distance = np.sqrt((head_x - prev_pos[0])**2 + (head_y - prev_pos[1])**2)
-                if distance < best_distance:
-                    best_distance = distance
-                    best_id = track_id
-
-            # Assign to tracked head or create new
-            if best_id is not None:
-                self.tracked_heads[best_id] = (head_x, head_y)
-                tracked.append((best_id, det))
-            else:
-                new_id = self.next_id
-                self.next_id += 1
-                self.tracked_heads[new_id] = (head_x, head_y)
-                tracked.append((new_id, det))
-
-        return tracked
-
-    def reset(self):
-        """Reset tracking for new map."""
-        self.tracked_heads = {}
-        self.next_id = 0
+            head_x = int((x1 + x2) / 2)
+            head_y = int(y1 + (y2 - y1) * 0.15)
+            dist = ((head_x - cx) ** 2 + (head_y - cy) ** 2) ** 0.5
+            if dist < best_dist:
+                best_dist = dist
+                best = (head_x - cx, head_y - cy)
+        return best
