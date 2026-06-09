@@ -20,7 +20,11 @@ from .base_mouse import BaseMouse
 def get_mouse_implementation(config):
     name = config.bot_input_type
 
-    if name == 'winapi':
+    if name == 'kmbox':
+        print('Using KMBoxMouse')
+        from .kmbox_mouse import KMBoxMouse
+        return KMBoxMouse(config)
+    elif name == 'winapi':
         print('Using WinApiMouse')
         from .winapi_mouse import WinApiMouse
         return WinApiMouse(config)
