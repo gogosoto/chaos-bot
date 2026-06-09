@@ -21,7 +21,7 @@ import os
 
 
 class ConfigReader:
-    def __init__(self):
+    def __init__(self, path: str = None):
         self.parser = ConfigParser()
 
         # Communication
@@ -102,14 +102,32 @@ class ConfigReader:
         self.pose_lead_crouching = None
         self.pose_lead_prone = None
 
+        # KMBox
+        self.kmbox_ip = None
+        self.kmbox_port = None
+        self.kmbox_uid = None
+        # Capture
+        self.capture_device = None
+        self.capture_width = None
+        self.capture_height = None
+        self.capture_fps = None
+        self.game_width = None
+        self.game_height = None
+        # Detection
+        self.detection_mode = None
+        self.yolo_model = None
+        self.yolo_confidence = None
+
         # Get config path and read it
-        self.path = os.path.join(os.path.dirname(__file__), '../config.ini')
+        if path is None:
+            path = os.path.join(os.path.dirname(__file__), '../config.ini')
+        self.path = path
         self.parser.read(self.path)
 
     def read_config(self):
         # Get aim settings
         value = self.parser.get('aim', 'bot_input_type').lower()
-        bot_input_type_list = ['winapi', 'interception_driver', 'microcontroller_serial', 'microcontroller_socket']
+        bot_input_type_list = ['winapi', 'interception_driver', 'microcontroller_serial', 'microcontroller_socket', 'kmbox']
         if value in bot_input_type_list:
             self.bot_input_type = value
         else:
@@ -247,6 +265,25 @@ class ConfigReader:
         self.pose_lead_standing = float(self.parser.get('pose_detection', 'pose_lead_standing'))
         self.pose_lead_crouching = float(self.parser.get('pose_detection', 'pose_lead_crouching'))
         self.pose_lead_prone = float(self.parser.get('pose_detection', 'pose_lead_prone'))
+
+        if self.parser.has_section('kmbox'):
+            self.kmbox_ip   = self.parser.get('kmbox', 'kmbox_ip')
+            self.kmbox_port = int(self.parser.get('kmbox', 'kmbox_port'))
+            self.kmbox_uid  = self.parser.get('kmbox', 'kmbox_uid')
+
+        if self.parser.has_section('capture'):
+            self.capture_device = self.parser.get('capture', 'device')
+            self.capture_width  = int(self.parser.get('capture', 'capture_width'))
+            self.capture_height = int(self.parser.get('capture', 'capture_height'))
+            self.capture_fps    = int(self.parser.get('capture', 'capture_fps'))
+            self.game_width     = int(self.parser.get('capture', 'game_width'))
+            self.game_height    = int(self.parser.get('capture', 'game_height'))
+
+        if self.parser.has_section('detection'):
+            value = self.parser.get('detection', 'mode').lower()
+            self.detection_mode  = value if value in ('color', 'hybrid') else 'color'
+            self.yolo_model      = self.parser.get('detection', 'yolo_model')
+            self.yolo_confidence = float(self.parser.get('detection', 'yolo_confidence'))
 
     @staticmethod
     def read_hex(string):
