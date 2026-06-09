@@ -53,7 +53,12 @@ def main():
             return
         print("Exporting to CoreML for Mac M1...")
         model.export(format="coreml")
-        print(f"Done: {MODEL_CML}")
+        # ultralytics may write to CWD — move into models/
+        src = "yolo11n.mlpackage"
+        if os.path.exists(src):
+            os.rename(src, MODEL_CML)
+        print(f"Done: {MODEL_CML}" if os.path.exists(MODEL_CML) else
+              f"WARNING: mlpackage not at expected path — check ultralytics output")
 
     else:
         print("CPU-only Linux: no export needed, running .pt directly.")
