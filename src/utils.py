@@ -15,10 +15,9 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-import win32api
-from time import sleep
-
+import time
 from configReader import ConfigReader
+from input_state import InputState
 
 
 class Utils:
@@ -28,32 +27,36 @@ class Utils:
 
         self.delay = 0.25
         self.key_reload_config = self.config.key_reload_config
-        self.key_toggle_aim = self.config.key_toggle_aim
+        self.key_toggle_aim    = self.config.key_toggle_aim
         self.key_toggle_recoil = self.config.key_toggle_recoil
-        self.key_exit = self.config.key_exit
-        self.key_trigger = self.config.key_trigger
-        self.key_rapid_fire = self.config.key_rapid_fire
-        self.aim_keys = self.config.aim_keys
-        self.aim_state = False
-        self.recoil_state = False
+        self.key_exit          = self.config.key_exit
+        self.key_trigger       = self.config.key_trigger
+        self.key_rapid_fire    = self.config.key_rapid_fire
+        self.aim_keys          = self.config.aim_keys
+        self.aim_state         = False
+        self.recoil_state      = False
 
-    def check_key_binds(self):  # Return a boolean based on if the config needs to be reloaded
-        if win32api.GetAsyncKeyState(self.key_reload_config) < 0:
+        self.input = InputState()
+
+    def check_key_binds(self):
+        if self.input.is_vk_pressed(self.key_reload_config):
             return True
 
-        if win32api.GetAsyncKeyState(self.key_toggle_aim) < 0:
+        if self.input.is_vk_pressed(self.key_toggle_aim):
             self.aim_state = not self.aim_state
             print("AIM: " + str(self.aim_state))
-            sleep(self.delay)
+            time.sleep(self.delay)
 
-        if win32api.GetAsyncKeyState(self.key_toggle_recoil) < 0:
+        if self.input.is_vk_pressed(self.key_toggle_recoil):
             self.recoil_state = not self.recoil_state
             print("RECOIL: " + str(self.recoil_state))
-            sleep(self.delay)
-        
-        if win32api.GetAsyncKeyState(self.key_exit) < 0:
+            time.sleep(self.delay)
+
+        if self.input.is_vk_pressed(self.key_exit):
             print("Exiting")
+            self.input.stop()
             exit(1)
+
         return False
 
     def reload_config(self):
@@ -63,21 +66,19 @@ class Utils:
         if self.aim_state:
             if self.aim_keys[0] == 'off':
                 return True
-            else:
-                for key in self.aim_keys:
-                    if win32api.GetAsyncKeyState(key) < 0:
-                        return True
+            for key in self.aim_keys:
+                if self.input.is_vk_pressed(key):
+                    return True
         return False
 
     def get_trigger_state(self):
-        if win32api.GetAsyncKeyState(self.key_trigger) < 0:
-            return True
-        return False
+        return self.input.is_vk_pressed(self.key_trigger)
 
     def get_rapid_fire_state(self):
-        if win32api.GetAsyncKeyState(self.key_rapid_fire) < 0:
-            return True
-        return False
+        return self.input.is_vk_pressed(self.key_rapid_fire)
+
+    def get_input_state(self):
+        return self.input
 
     @staticmethod
     def print_attributes(obj):
