@@ -67,7 +67,7 @@ class Unibot:
                     mouse.click()
 
                 # Apply recoil
-                cheats.apply_recoil(utils.recoil_state, delta_time)
+                cheats.apply_recoil(utils.recoil_state, delta_time, utils.get_input_state())
 
                 # Move the mouse based on the previous calculations
                 if cheats.move_x != 0 or cheats.move_y != 0:
