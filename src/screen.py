@@ -17,22 +17,40 @@
 """
 import cv2
 import numpy as np
-import bettercam
-from pyautogui import size
+import platform
 from shape_validator import ShapeValidator
 
 
 class Screen:
     def __init__(self, config):
         self.cfg = config
-        self.cam = bettercam.create(output_color="BGR")
         self.validator = ShapeValidator(config)
 
-        if self.cfg.auto_detect_resolution:
-            screen_size = size()
-            self.screen = (screen_size.width, screen_size.height)
+        device = getattr(self.cfg, 'capture_device', '/dev/video0')
+        if platform.system() == 'Darwin':
+            try:
+                device = int(device)
+            except (ValueError, TypeError):
+                device = 0
+            backend = cv2.CAP_AVFOUNDATION
         else:
-            self.screen = (self.cfg.resolution_x, self.cfg.resolution_y)
+            backend = cv2.CAP_V4L2
+
+        self.cam = cv2.VideoCapture(device, backend)
+        self.cam.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+        self.cam.set(cv2.CAP_PROP_FRAME_WIDTH,  getattr(self.cfg, 'capture_width',  1920))
+        self.cam.set(cv2.CAP_PROP_FRAME_HEIGHT, getattr(self.cfg, 'capture_height', 1080))
+        self.cam.set(cv2.CAP_PROP_FPS,          getattr(self.cfg, 'capture_fps',    60))
+        self.cam.set(cv2.CAP_PROP_BUFFERSIZE, 2)
+
+        cap_w = int(self.cam.get(cv2.CAP_PROP_FRAME_WIDTH))
+        cap_h = int(self.cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self.screen = (cap_w, cap_h)
+
+        game_w = getattr(self.cfg, 'game_width',  cap_w)
+        game_h = getattr(self.cfg, 'game_height', cap_h)
+        self.scale_x = game_w / cap_w if cap_w > 0 else 1.0
+        self.scale_y = game_h / cap_h if cap_h > 0 else 1.0
 
         self.screen_center = (self.screen[0] // 2, self.screen[1] // 2)
         self.screen_region = (
@@ -68,13 +86,15 @@ class Screen:
             cv2.namedWindow(self.window_name)
 
     def __del__(self):
-        del self.cam
+        if hasattr(self, 'cam') and self.cam is not None:
+            self.cam.release()
 
     def screenshot(self, region):
         while True:
-            image = self.cam.grab(region)
-            if image is not None:
-                return np.array(image)
+            ret, frame = self.cam.read()
+            if ret and frame is not None:
+                x1, y1, x2, y2 = region
+                return frame[y1:y2, x1:x2]
 
     def get_target(self, recoil_offset):
         # Convert the offset to an integer, since it is used to define the capture region
